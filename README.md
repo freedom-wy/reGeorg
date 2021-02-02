@@ -1,20 +1,6 @@
 reGeorg
 =========
-
-```                    _____
-  _____   ______  __|___  |__  ______  _____  _____   ______
- |     | |   ___||   ___|    ||   ___|/     \|     | |   ___|
- |     \ |   ___||   |  |    ||   ___||     ||     \ |   |  |
- |__|\__\|______||______|  __||______|\_____/|__|\__\|______|
-                    |_____|
-                    ... every office needs a tool like Georg
-```
-willem@sensepost.com / [@\_w\_m\_\_]
-
-sam@sensepost.com / [@trowalts]
-
-etienne@sensepost.com / [@kamp_staaldraad]
-
+对原regeorg进行了修改
 
 Version
 ----
@@ -67,15 +53,3 @@ Example
 ```
 $ python reGeorgSocksProxy.py -p 8080 -u http://upload.sensepost.net:8080/tunnel/tunnel.jsp
 ```
-
-License
-----
-
-MIT
-
-
-[@\_w\_m\_\_]:http://twitter.com/_w_m__
-[@trowalts]:http://twitter.com/trowalts
-[@kamp_staaldraad]:http://twitter.com/kamp_staaldraad
-[urllib3]:https://pypi.python.org/pypi/urllib3
-[proxychains]:http://sourceforge.net/projects/proxychains/
