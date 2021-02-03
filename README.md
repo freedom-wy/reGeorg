@@ -1,21 +1,21 @@
-reGeorg
+w_reGeorg
 =========
-对原regeorg进行了修改
+fork_reGeorg对原regeorg进行了修改
 
-Version
+版本
 ----
 
 1.0
 
-Dependencies
+描述
 -----------
 
-reGeorg requires Python 2.7 and the following modules:
+w_reGeorg 运行于python2.7环境:
 
-* [urllib3] - HTTP library with thread-safe connection pooling, file post, and more.
+* [requests] -  依赖requests包，需要先通过pip install requests进行安装
  
 
-Usage
+使用方法
 --------------
 
 ```
@@ -34,22 +34,17 @@ optional arguments:
 ```
 
 * **Step 1.**
-Upload tunnel.(aspx|ashx|jsp|php) to a webserver (How you do that is up to
-you)
+上传 tunnel.(aspx|ashx|jsp|php) 到web服务器 
 
 * **Step 2.**
-Configure you tools to use a socks proxy, use the ip address and port you
-specified when
-you started the reGeorgSocksProxy.py
+启动reGeorg工具
+配置proxychains(linux)或Proxifier(windows)代理工具流量到目标网络
 
-** Note, if you tools, such as NMap doesn't support socks proxies, use
-[proxychains] (see wiki) 
-
-* **Step 3.** Hack the planet :)
+* **Step 3.** 干！ :)
 
 
 Example
 ---------
 ```
-$ python reGeorgSocksProxy.py -p 8080 -u http://upload.sensepost.net:8080/tunnel/tunnel.jsp
+$ python reGeorgSocksProxy.py -p 8080 -u http://xxx.xxx.xxx:8080/tunnel/tunnel.jsp
 ```
