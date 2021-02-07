@@ -23,10 +23,12 @@
                 # 正常访问
                 # 设置为非阻塞模式
                 stream_set_blocking($res, false);
+                # 创建会话
                 @session_start();
                 $_SESSION["run"] = true;
                 $_SESSION["writebuf"] = "";
                 $_SESSION["readbuf"] = "";
+                # 清除缓冲区
                 ob_end_clean();
                 header('X-STATUS: OK');
                 header("Connection: close");
@@ -42,6 +44,7 @@
                     $readBuff = "";
                     @session_start();
                     $writeBuff = $_SESSION["writebuf"];
+                    echo var_dump($writeBuff);
                     $_SESSION["writebuf"] = "";
                     session_write_close();
                     if ($writeBuff != ""){
