@@ -11,7 +11,6 @@
         switch($cmd){
             case "CONNECT":{
                 $target = $headers["X-Target"];
-                # $port = (int)$headers["X-Port"];
                 $port = $headers["X-Port"];
                 $res = fsockopen($target, $port);
                 # 访问出错
