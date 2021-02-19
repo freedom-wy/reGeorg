@@ -1,7 +1,7 @@
 w_reGeorg
 =========
-py2_reGeorg对原regeorg进行了修改,python2环境
-py3_reGeorg对原regeorg进行了修改,python3环境
+py2_reGeorg对原regeorg进行了修改,python2环境  
+py3_reGeorg对原regeorg进行了修改,python3环境  
 
 版本
 ----
@@ -39,7 +39,7 @@ optional arguments:
 启动reGeorg工具
 配置proxychains(linux)或Proxifier(windows)代理工具流量到目标网络
 
-* **Step 3.** 干！ :)
+* **Step 3.** 干！ :)  
 ```shell script
 freedom@freedom-virtual-machine:~/reGeorg$ sudo proxychains nmap -Pn -sT 192.168.2.1 -p 1-30
 ProxyChains-3.1 (http://proxychains.sf.net)
@@ -83,6 +83,23 @@ PORT   STATE SERVICE
 22/tcp open  ssh
 
 Nmap done: 1 IP address (1 host up) scanned in 28.48 seconds
+```
+```shell script
+freedom@freedom-virtual-machine:~/reGeorg$ sudo proxychains curl 192.168.2.1
+sh: 0: getcwd() failed: No such file or directory
+ProxyChains-3.1 (http://proxychains.sf.net)
+|S-chain|-<>-127.0.0.1:8889-<><>-192.168.2.1:80-<><>-OK
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd"><html><head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+		<title>Apache HTTP Server Test Page powered by CentOS</title>
+		<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+    <!-- Bootstrap -->
+    <link href="/noindex/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="noindex/css/open-sans.css" type="text/css" />
+
+<style type="text/css"><!--		 
+
 ```
 
 
