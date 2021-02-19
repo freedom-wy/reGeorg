@@ -141,23 +141,31 @@ class session(Thread):
         """新的获取cookie方法"""
         HEADER.update({"X-CMD": "CONNECT", "X-TARGET": target, "X-PORT": targetPort})
         cookie = None
-        response = requests.post(url=self.connectString, headers=HEADER, data=None, timeout=TIMEOUT)
-        if response:
-            response_header = response.headers
-            if response.status_code == 200 and response_header.get("X-STATUS") == "OK":
-                cookie = response_header.get("Set-Cookie")
-                logger.info("[%s:%s] HTTP [200]: cookie [%s]" % (target, targetPort, cookie))
-            elif response_header.get("X-ERROR"):
-                logger.error(response_header.get("X-ERROR"))
+        try:
+            response = requests.post(url=self.connectString, headers=HEADER, data=None, timeout=TIMEOUT)
+        except Exception, e:
+            return
         else:
-            logger.error("[%s:%s] HTTP [%d]" % (target, targetPort, response.status_code))
-        return cookie
+            if response:
+                response_header = response.headers
+                if response.status_code == 200 and response_header.get("X-STATUS") == "OK":
+                    cookie = response_header.get("Set-Cookie")
+                    logger.info("[%s:%s] HTTP [200]: cookie [%s]" % (target, targetPort, cookie))
+                elif response_header.get("X-ERROR"):
+                    logger.error(response_header.get("X-ERROR"))
+            else:
+                logger.error("[%s:%s] HTTP [%d]" % (target, targetPort, response.status_code))
+            return cookie
 
     def closeRemoteSession(self):
         HEADER.update({"X-CMD": "DISCONNECT", "Cookie": self.cookie})
-        response = requests.post(url=self.connectString, headers=HEADER, data=None, timeout=TIMEOUT)
-        if response.status_code == 200:
-            logger.info("[%s:%d] Connection Terminated" % (self.httpHost, self.httpPort))
+        try:
+            response = requests.post(url=self.connectString, headers=HEADER, data=None, timeout=TIMEOUT)
+        except Exception, e:
+            logger.error("Close Connection Failure")
+        else:
+            if response.status_code == 200:
+                logger.info("[%s:%d] Connection Terminated" % (self.httpHost, self.httpPort))
 
     def run(self):
         try:
@@ -171,14 +179,18 @@ class session(Thread):
 
 def askgeorg(url):
     """新的检测reg连接方法"""
-    response = requests.get(url=url, headers=HEADER, timeout=TIMEOUT)
-    if response:
-        text = response.text.strip()
-        if response.status_code == 200 and text == "Georg says, 'All seems fine'":
-            logger.info(text)
-            return True
-    else:
+    try:
+        response = requests.get(url=url, headers=HEADER, timeout=TIMEOUT)
+    except Exception, e:
         return False
+    else:
+        if response:
+            text = response.text.strip()
+            if response.status_code == 200 and text == "Georg says, 'All seems fine'":
+                logger.info(text)
+                return True
+        else:
+            return False
 
 
 if __name__ == '__main__':

@@ -7,17 +7,18 @@ from socket import *
 from threading import Thread
 import requests
 from handle_log import logger
+from traceback import format_exc
 
 # Constants
 SOCKTIMEOUT = 5
 RESENDTIMEOUT = 300
-VER = "\x05"
-METHOD = "\x00"
-SUCCESS = "\x00"
+VER = "\x05".encode()
+METHOD = "\x00".encode()
+SUCCESS = "\x00".encode()
 SOCKFAIL = "\x01"
 NETWORKFAIL = "\x02"
 HOSTFAIL = "\x04"
-REFUSED = "\x05"
+REFUSED = "\x05".encode()
 TTLEXPIRED = "\x06"
 UNSUPPORTCMD = "\x07"
 ADDRTYPEUNSPPORT = "\x08"
@@ -78,7 +79,7 @@ class session(Thread):
         # 05:00
         sock.sendall(VER + METHOD)
         # :02
-        ver = sock.recv(1)
+        ver = sock.recv(1).decode()
         if ver == "\x02":  # this is a hack for proxychains
             # 05:01:00:01----:c0:a8:01:02:00:50
             # '\x05', '\x01', '\x00', '\x01'
@@ -87,14 +88,14 @@ class session(Thread):
             cmd, rsv, atyp = (sock.recv(1), sock.recv(1), sock.recv(1))
         target = None
         targetPort = None
-        if atyp == "\x01":  # IPv4
+        if atyp.decode() == "\x01":  # IPv4
             # Reading 6 bytes for the IP and Port
             # c0:a8:01:02
             target = sock.recv(4)
             # 00:50
             targetPort = sock.recv(2)
             # 目标地址192.168.2.1
-            target = ".".join([str(ord(i)) for i in target])
+            target = ".".join([str(i) for i in target])
         # elif atyp == "\x03":  # Hostname
         #     targetLen = ord(sock.recv(1))  # hostname length (1 byte)
         #     target = sock.recv(targetLen)
@@ -108,12 +109,12 @@ class session(Thread):
         #         tmp_addr.append(unichr(ord(target[2 * i]) * 256 + ord(target[2 * i + 1])))
         #     target = ":".join(tmp_addr)
         # 80
-        targetPort = ord(targetPort[0]) * 256 + ord(targetPort[1])
-        if cmd == "\x02":  # BIND
+        targetPort = targetPort[0] * 256 + targetPort[1]
+        if cmd.decode() == "\x02":  # BIND
             raise SocksCmdNotImplemented("Socks5 - BIND not implemented")
-        elif cmd == "\x03":  # UDP
+        elif cmd.decode() == "\x03":  # UDP
             raise SocksCmdNotImplemented("Socks5 - UDP not implemented")
-        elif cmd == "\x01":  # CONNECT
+        elif cmd.decode() == "\x01":  # CONNECT
             serverIp = target
             try:
                 serverIp = gethostbyname(target)
@@ -124,15 +125,15 @@ class session(Thread):
             # 获取cookie,在服务端的脚本中，会执行相应端口探测
             self.cookie = self.setupRemoteSession(target=target, targetPort=str(targetPort))
             if self.cookie:
-                sock.sendall(VER + SUCCESS + "\x00" + "\x01" + serverIp + chr(targetPort // 256) + chr(targetPort % 256))
+                sock.sendall(VER + SUCCESS + b"\x00" + b"\x01" + serverIp.encode() + chr(targetPort // 256).encode() + chr(targetPort % 256).encode())
                 return True
             else:
-                sock.sendall(VER + REFUSED + "\x00" + "\x01" + serverIp + chr(targetPort // 256) + chr(targetPort % 256))
+                sock.sendall(VER + REFUSED + b"\x00" + b"\x01" + serverIp.encode() + chr(targetPort // 256).encode() + chr(targetPort % 256).encode())
                 return False
 
     def handleSocks(self, sock):
         # 通过proxychain模拟客户端发送数据，第一个字节可以判断是socks5还是socks4
-        ver = sock.recv(1)
+        ver = sock.recv(1).decode()
         # 05:02:00:02
         if ver == "\x05":
             return self.parseSocks5(sock)
@@ -141,44 +142,57 @@ class session(Thread):
         """新的获取cookie方法"""
         HEADER.update({"X-CMD": "CONNECT", "X-TARGET": target, "X-PORT": targetPort})
         cookie = None
-        response = requests.post(url=self.connectString, headers=HEADER, data=None, timeout=TIMEOUT)
-        if response:
-            response_header = response.headers
-            if response.status_code == 200 and response_header.get("X-STATUS") == "OK":
-                cookie = response_header.get("Set-Cookie")
-                logger.info("[%s:%s] HTTP [200]: cookie [%s]" % (target, targetPort, cookie))
-            elif response_header.get("X-ERROR"):
-                logger.error(response_header.get("X-ERROR"))
+        try:
+            response = requests.post(url=self.connectString, headers=HEADER, data=None, timeout=TIMEOUT)
+        except Exception as e:
+            return
         else:
-            logger.error("[%s:%s] HTTP [%d]" % (target, targetPort, response.status_code))
-        return cookie
+            if response:
+                response_header = response.headers
+                if response.status_code == 200 and response_header.get("X-STATUS") == "OK":
+                    cookie = response_header.get("Set-Cookie")
+                    logger.info("[%s:%s] HTTP [200]: cookie [%s]" % (target, targetPort, cookie))
+                elif response_header.get("X-ERROR"):
+                    logger.error(response_header.get("X-ERROR"))
+            else:
+                logger.error("[%s:%s] HTTP [%d]" % (target, targetPort, response.status_code))
+            return cookie
 
     def closeRemoteSession(self):
         HEADER.update({"X-CMD": "DISCONNECT", "Cookie": self.cookie})
-        response = requests.post(url=self.connectString, headers=HEADER, data=None, timeout=TIMEOUT)
-        if response.status_code == 200:
-            logger.info("[%s:%d] Connection Terminated" % (self.httpHost, self.httpPort))
+        try:
+            response = requests.post(url=self.connectString, headers=HEADER, data=None, timeout=TIMEOUT)
+        except Exception as e:
+            logger.error("Close Connection Failure")
+        else:
+            if response.status_code == 200:
+                logger.info("[%s:%d] Connection Terminated" % (self.httpHost, self.httpPort))
 
     def run(self):
         try:
             self.handleSocks(self.pSocket)
         except Exception as e:
             # 报错关闭连接
-            logger.error(str(e))
+            logger.error(format_exc())
             self.closeRemoteSession()
             self.pSocket.close()
 
 
 def askgeorg(url):
     """新的检测reg连接方法"""
-    response = requests.get(url=url, headers=HEADER, timeout=TIMEOUT)
-    if response:
-        text = response.text.strip()
-        if response.status_code == 200 and text == "Georg says, 'All seems fine'":
-            logger.info(text)
-            return True
-    else:
+    try:
+        response = requests.get(url=url, headers=HEADER, timeout=TIMEOUT)
+    except Exception as e:
+        logger.error(format_exc())
         return False
+    else:
+        if response:
+            text = response.text.strip()
+            if response.status_code == 200 and text == "Georg says, 'All seems fine'":
+                logger.info(text)
+                return True
+        else:
+            return False
 
 
 if __name__ == '__main__':

@@ -1,16 +1,17 @@
 w_reGeorg
 =========
-fork_reGeorg对原regeorg进行了修改
+py2_reGeorg对原regeorg进行了修改,python2环境
+py3_reGeorg对原regeorg进行了修改,python3环境
 
 版本
 ----
 
-1.0
+1.1
 
 描述
 -----------
 
-w_reGeorg 运行于python2.7环境:
+w_reGeorg 运行于python环境:
 
 * [requests] -  依赖requests包，需要先通过pip install requests进行安装
  
@@ -29,8 +30,6 @@ optional arguments:
   -p , --listen-port   The default listening port
   -r , --read-buff     Local read buffer, max data to be sent per POST
   -u , --url           The url containing the tunnel script
-  -v , --verbose       Verbose output[INFO|DEBUG]
-
 ```
 
 * **Step 1.**
