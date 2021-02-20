@@ -142,7 +142,7 @@ class session(Thread):
             return self.parseSocks5(sock)
 
     def setupRemoteSession(self, target, targetPort):
-        """新的获取cookie方法"""
+        """探测端口存活"""
         header = ({"X-CMD": "CONNECT", "X-TARGET": target, "X-PORT": targetPort})
         cookie = None
         try:
@@ -183,7 +183,7 @@ class session(Thread):
                     response_header = response.headers
                     status = response_header.get("x-status")
                     if status == "OK":
-                        response_data = response.text
+                        response_data = response.content
                     else:
                         logger.error("[%s:%d] HTTP [%d]: Status: [%s]: Message [%s] Shutting down" % (
                         self.target, self.targetPort, response.status_code, status, response_header.get("X-ERROR")))
@@ -212,6 +212,7 @@ class session(Thread):
         while True:
             try:
                 self.pSocket.settimeout(1)
+                # 'GET / HTTP/1.1\r\nHost: 192.168.2.1\r\nUser-Agent: curl/7.58.0\r\nAccept: */*\r\n\r\n'
                 data = self.pSocket.recv(READBUFSIZE)
                 if not data:
                     break
@@ -262,7 +263,7 @@ class session(Thread):
 
 
 def askgeorg(url):
-    """新的检测reg连接方法"""
+    """检测reg连接方法"""
     try:
         response = requests.get(url=url, headers=HEADER, timeout=TIMEOUT)
     except Exception, e:
