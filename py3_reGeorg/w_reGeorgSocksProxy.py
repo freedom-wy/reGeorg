@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+import time
 import argparse
 from urllib.parse import urlparse
 from socket import *
@@ -95,7 +96,7 @@ class session(Thread):
             # 00:50
             targetPort = sock.recv(2)
             # 目标地址192.168.2.1
-            target = ".".join([str(i) for i in target])
+            self.target = ".".join([str(i) for i in target])
         # elif atyp == "\x03":  # Hostname
         #     targetLen = ord(sock.recv(1))  # hostname length (1 byte)
         #     target = sock.recv(targetLen)
@@ -109,26 +110,27 @@ class session(Thread):
         #         tmp_addr.append(unichr(ord(target[2 * i]) * 256 + ord(target[2 * i + 1])))
         #     target = ":".join(tmp_addr)
         # 80
-        targetPort = targetPort[0] * 256 + targetPort[1]
+        self.targetPort = targetPort[0] * 256 + targetPort[1]
         if cmd.decode() == "\x02":  # BIND
             raise SocksCmdNotImplemented("Socks5 - BIND not implemented")
         elif cmd.decode() == "\x03":  # UDP
             raise SocksCmdNotImplemented("Socks5 - UDP not implemented")
         elif cmd.decode() == "\x01":  # CONNECT
-            serverIp = target
+            serverIp = self.target
             try:
-                serverIp = gethostbyname(target)
+                serverIp = gethostbyname(self.target)
             except:
+                print(format_exc())
                 logger.error("oeps")
             # 又转回来\xc0\xa8\x02\x01
-            serverIp = "".join([chr(int(i)) for i in serverIp.split(".")])
+            serverIp = bytes(map(int, self.target.split('.')))
             # 获取cookie,在服务端的脚本中，会执行相应端口探测
-            self.cookie = self.setupRemoteSession(target=target, targetPort=str(targetPort))
+            self.cookie = self.setupRemoteSession(target=self.target, targetPort=str(self.targetPort))
             if self.cookie:
-                sock.sendall(VER + SUCCESS + b"\x00" + b"\x01" + serverIp.encode() + chr(targetPort // 256).encode() + chr(targetPort % 256).encode())
+                sock.sendall(VER + SUCCESS + b"\x00" + b"\x01" + serverIp + chr(self.targetPort // 256).encode() + chr(self.targetPort % 256).encode())
                 return True
             else:
-                sock.sendall(VER + REFUSED + b"\x00" + b"\x01" + serverIp.encode() + chr(targetPort // 256).encode() + chr(targetPort % 256).encode())
+                sock.sendall(VER + REFUSED + b"\x00" + b"\x01" + serverIp + chr(self.targetPort // 256).encode() + chr(self.targetPort % 256).encode())
                 return False
 
     def handleSocks(self, sock):
@@ -140,10 +142,10 @@ class session(Thread):
 
     def setupRemoteSession(self, target, targetPort):
         """新的获取cookie方法"""
-        HEADER.update({"X-CMD": "CONNECT", "X-TARGET": target, "X-PORT": targetPort})
+        headers = {"X-CMD": "CONNECT", "X-TARGET": target, "X-PORT": targetPort}
         cookie = None
         try:
-            response = requests.post(url=self.connectString, headers=HEADER, data=None, timeout=TIMEOUT)
+            response = requests.post(url=self.connectString, headers=headers, data=None, timeout=TIMEOUT)
         except Exception as e:
             return
         else:
@@ -168,9 +170,90 @@ class session(Thread):
             if response.status_code == 200:
                 logger.info("[%s:%d] Connection Terminated" % (self.httpHost, self.httpPort))
 
+    def reader(self):
+        while True:
+            try:
+                if not self.pSocket:
+                    break
+                header = {"X-CMD": "READ", "Cookie": self.cookie, "Connection": "Keep-Alive"}
+                response = requests.post(url=self.connectString, headers=header, data=None)
+                response_data = None
+                if response.status_code == 200:
+                    response_header = response.headers
+                    status = response_header.get("x-status")
+                    if status == "OK":
+                        response_data = response.content
+                    else:
+                        logger.error("[%s:%d] HTTP [%d]: Status: [%s]: Message [%s] Shutting down" % (
+                        self.target, self.targetPort, response.status_code, status, response_header.get("X-ERROR")))
+                else:
+                    logger.error(
+                        "[%s:%d] HTTP [%d]: Shutting down" % (self.target, self.targetPort, response.status_code))
+                if response_data is None:
+                    # Remote socket closed
+                    break
+                if len(response_data) == 0:
+                    time.sleep(0.1)
+                    continue
+                self.pSocket.send(response_data)
+            except Exception as ex:
+                print(format_exc())
+                raise ex
+        self.closeRemoteSession()
+        logger.debug("[%s:%d] Closing localsocket" % (self.target, self.targetPort))
+        try:
+            self.pSocket.close()
+        except:
+            logger.debug("[%s:%d] Localsocket already closed" % (self.target, self.targetPort))
+
+    def writer(self):
+        global READBUFSIZE
+        while True:
+            try:
+                self.pSocket.settimeout(1)
+                # 'GET / HTTP/1.1\r\nHost: 192.168.2.1\r\nUser-Agent: curl/7.58.0\r\nAccept: */*\r\n\r\n'
+                data = self.pSocket.recv(READBUFSIZE)
+                if not data:
+                    break
+                header = {"X-CMD": "FORWARD", "Cookie": self.cookie, "Content-Type": "application/octet-stream",
+                          "Connection": "Keep-Alive"}
+                # 携带数据
+                response = requests.post(url=self.connectString, headers=header, data=data)
+                if response.status_code == 200:
+                    response_header = response.headers
+                    status = response_header.get("x-status")
+                    if status == "OK":
+                        if response_header.get("set-cookie") is not None:
+                            self.cookie = response_header.get("set-cookie")
+                    else:
+                        logger.error("[%s:%d] HTTP [%d]: Status: [%s]: Message [%s] Shutting down" % (
+                        self.target, self.targetPort, response.status_code, status, response_header.get("x-error")))
+                        break
+                else:
+                    logger.error(
+                        "[%s:%d] HTTP [%d]: Shutting down" % (self.target, self.targetPort, response.status_code))
+                    break
+                # transferLog.info("[%s:%d] >>>> [%d]" % (self.target, self.port, len(data)))
+            except timeout:
+                continue
+            except Exception as ex:
+                raise ex
+        self.closeRemoteSession()
+        logger.debug("Closing localsocket")
+        try:
+            self.pSocket.close()
+        except:
+            logger.debug("Localsocket already closed")
+
     def run(self):
         try:
-            self.handleSocks(self.pSocket)
+            if self.handleSocks(self.pSocket):
+                r = Thread(target=self.reader, args=())
+                w = Thread(target=self.writer, args=())
+                r.start()
+                w.start()
+                r.join()
+                w.join()
         except Exception as e:
             # 报错关闭连接
             logger.error(format_exc())
@@ -179,7 +262,7 @@ class session(Thread):
 
 
 def askgeorg(url):
-    """新的检测reg连接方法"""
+    """检测reg连接方法"""
     try:
         response = requests.get(url=url, headers=HEADER, timeout=TIMEOUT)
     except Exception as e:
